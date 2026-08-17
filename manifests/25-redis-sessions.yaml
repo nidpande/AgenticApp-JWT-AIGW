@@ -1,0 +1,50 @@
+# ------------------------------------------------------------------
+# Redis for agent-api SESSION STORE (Phase 4).
+#
+# Distinct from the Portkey gateway's Redis in the airs-gw namespace
+# (manifests/20-redis.yaml). This Redis lives in the agent-app
+# namespace and only holds OIDC session snapshots keyed by aigw-chat:sid:<sid>
+# so that agent-api pod restarts / scale-outs don't wipe user logins.
+#
+# Ephemeral (no PVC): session records carry a TTL derived from the access-token
+# lifetime; losing them just forces a fresh Keycloak login.
+# ------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: agent-app
+  labels: { app: redis, role: session-store }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: redis, role: session-store }
+  template:
+    metadata:
+      labels: { app: redis, role: session-store }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["--save", "", "--appendonly", "no"]
+          ports:
+            - { containerPort: 6379, name: redis }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 500m, memory: 256Mi }
+          readinessProbe:
+            tcpSocket: { port: 6379 }
+            initialDelaySeconds: 2
+          livenessProbe:
+            tcpSocket: { port: 6379 }
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: agent-app
+spec:
+  selector: { app: redis, role: session-store }
+  ports:
+    - { name: redis, port: 6379, targetPort: 6379 }

@@ -1,0 +1,29 @@
+# -------- secrets & environment --------
+# Never commit real credentials. .env.example is the safe template.
+.env
+.env.*
+!.env.example
+
+# -------- editor / IDE --------
+.idea/
+.vscode/
+
+# -------- OS junk --------
+.DS_Store
+
+# -------- Python --------
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# -------- ad-hoc backups (frequent leak vector) --------
+# Anything ending in .bak or .bak.<timestamp> is treated as an untrusted
+# scratch copy and must NOT be committed - they routinely contain secrets
+# that were later removed from the "real" file.
+*.bak
+*.bak.*
+*.orig
+*.swp
+*~
+.git-aigw/

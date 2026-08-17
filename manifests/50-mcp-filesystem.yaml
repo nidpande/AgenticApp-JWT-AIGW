@@ -1,0 +1,69 @@
+# Filesystem MCP server (official @modelcontextprotocol/server-filesystem)
+# The reference implementation is stdio-only, so we front it with
+# supergateway (https://github.com/supercorp-ai/supergateway) to expose
+# HTTP-Streamable transport that Portkey MCP Gateway can talk to.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-filesystem-data
+  namespace: mcp-servers
+data:
+  hello.txt: |
+    Hello from Prisma AIRS AIGW hybrid POC!
+    This file lives inside the Filesystem MCP sandbox.
+  notes.md: |
+    # Sample notes
+    - AIGW enforces AIRS guardrails on every LLM call
+    - MCP Gateway proxies every tool call
+    - The agent never talks to OpenAI or MCP servers directly
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-filesystem
+  namespace: mcp-servers
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-filesystem }
+  template:
+    metadata:
+      labels: { app: mcp-filesystem }
+    spec:
+      containers:
+        - name: mcp
+          image: supercorp/supergateway:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--stdio"
+            - "npx -y @modelcontextprotocol/server-filesystem /data"
+            - "--outputTransport"
+            - "streamableHttp"
+            - "--port"
+            - "8080"
+            - "--streamableHttpPath"
+            - "/mcp"
+          ports:
+            - { containerPort: 8080, name: http }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+      volumes:
+        - name: data
+          configMap:
+            name: mcp-filesystem-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-filesystem
+  namespace: mcp-servers
+spec:
+  selector: { app: mcp-filesystem }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }

@@ -1,0 +1,45 @@
+# Official GitHub MCP server (github/github-mcp-server) in HTTP mode.
+# https://github.com/github/github-mcp-server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-github
+  namespace: mcp-servers
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-github }
+  template:
+    metadata:
+      labels: { app: mcp-github }
+    spec:
+      containers:
+        - name: mcp
+          image: ghcr.io/github/github-mcp-server:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "http"
+            - "--port"
+            - "8080"
+          env:
+            - name: GITHUB_PERSONAL_ACCESS_TOKEN
+              valueFrom: { secretKeyRef: { name: mcp-creds, key: GITHUB_TOKEN } }
+            - { name: GITHUB_TOOLSETS, value: "repos,issues,pull_requests,users" }
+          ports:
+            - { containerPort: 8080, name: http }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-github
+  namespace: mcp-servers
+spec:
+  selector: { app: mcp-github }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }

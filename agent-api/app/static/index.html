@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AIGW Chat</title>
+<style>
+:root{--bg:#0b1020;--panel:#121a33;--panel2:#1a2545;--border:#24325a;--text:#e9edf7;--text-dim:#98a3c2;--accent:#6ea8ff;--user-bg:#22345f;--bot-bg:#172142;--tool-bg:#0f1a3a;--danger:#ff6b7a;--shadow:0 4px 24px rgba(0,0,0,.35)}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:radial-gradient(1200px 800px at 10% -10%,#1a2450 0%,transparent 60%),radial-gradient(900px 700px at 100% 100%,#16224a 0%,transparent 55%),var(--bg);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border);background:rgba(11,16,32,.7)}
+.logo{font-size:22px}.title{font-weight:600;letter-spacing:.3px}.sub{color:var(--text-dim);font-size:12px}.spacer{flex:1}.user{color:var(--text-dim);font-size:13px}.logout{color:var(--accent);cursor:pointer;text-decoration:none;font-size:13px}.logout:hover{text-decoration:underline}
+main{flex:1;min-height:0;display:grid;grid-template-columns:260px 1fr;overflow:hidden}
+aside{background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:14px}
+aside h3{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);margin:4px 0 10px}
+.tool{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.tool .name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);font-size:12.5px;word-break:break-all}
+.tool .desc{color:var(--text-dim);font-size:12px;margin-top:3px}
+.empty{color:var(--text-dim);font-size:12px}
+section.chat{display:flex;flex-direction:column;min-width:0;min-height:0}
+#messages{flex:1;overflow-y:auto;padding:24px 40px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:780px;padding:12px 16px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;box-shadow:var(--shadow);border:1px solid var(--border);font-size:14.5px}
+.msg.user{align-self:flex-end;background:var(--user-bg);border-color:#2a3e75}
+.msg.bot{align-self:flex-start;background:var(--bot-bg)}
+.msg.tool{align-self:flex-start;background:var(--tool-bg);color:var(--text-dim);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;border-left:3px solid var(--accent);padding-left:12px}
+.msg .role{display:block;font-size:11px;letter-spacing:.5px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase}
+.composer{border-top:1px solid var(--border);background:rgba(11,16,32,.7);padding:12px 40px;display:flex;gap:10px}
+.composer textarea{flex:1;resize:none;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-height:42px;max-height:160px;font:inherit;outline:none}
+.composer textarea:focus{border-color:var(--accent)}
+.composer button{background:var(--accent);color:#0b1020;border:none;border-radius:10px;padding:0 20px;font-weight:600;cursor:pointer}
+.composer button:hover:not(:disabled){filter:brightness(1.1)}
+.composer button:disabled{opacity:.55;cursor:not-allowed}
+.banner{background:#2a1c22;color:var(--danger);padding:8px 16px;border-bottom:1px solid #4a2530;font-size:13px}
+.overlay{position:fixed;inset:0;background:rgba(6,10,24,.85);display:flex;align-items:center;justify-content:center;z-index:10}
+.login-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 32px;width:360px;box-shadow:var(--shadow)}
+.login-card h2{margin:0 0 6px;font-size:20px}
+.login-card p{margin:0 0 18px;color:var(--text-dim);font-size:13px}
+.login-card label{display:block;margin:10px 0 4px;font-size:12px;color:var(--text-dim)}
+.login-card input{width:100%;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font:inherit;outline:none}
+.login-card input:focus{border-color:var(--accent)}
+.login-card .err{color:var(--danger);font-size:12.5px;margin-top:10px;min-height:18px}
+.login-card button{margin-top:14px;width:100%;background:var(--accent);color:#0b1020;border:0;border-radius:10px;padding:10px 12px;font-weight:600;cursor:pointer;font-size:14px}
+.login-card .kc-btn{background:#4a86e8;color:#fff}
+.login-card .kc-btn:hover{filter:brightness(1.1)}
+.login-card .divider{display:flex;align-items:center;gap:10px;margin:22px 0 4px;color:var(--text-dim);font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase}
+.login-card .divider::before,.login-card .divider::after{content:"";flex:1;height:1px;background:var(--border)}
+.arch-note{color:var(--text-dim);font-size:12px;margin-top:14px;line-height:1.55}
+.arch-note code{color:var(--accent)}
+.typing{color:var(--text-dim);font-style:italic}
+@media(max-width:720px){main{grid-template-columns:1fr}aside{display:none}}
+</style>
+</head>
+<body>
+<div id="login" class="overlay" hidden>
+<div class="login-card">
+<h2>AIGW Chat</h2>
+<p>Sign in to access the Prisma AIRS hybrid AIGW.</p>
+
+<!-- Primary: OIDC login via Keycloak (BFF handles the code flow) -->
+<button id="kcLoginBtn" class="kc-btn">Sign in with Keycloak</button>
+<div class="arch-note" id="oidcHint">
+You will be redirected to Keycloak to authenticate. Your access-token then
+authorises every LLM call at <code>aigw.local</code> - no shared API key.
+</div>
+
+<!-- Legacy fallback: password login (hidden unless ?legacy=1 or OIDC disabled) -->
+<div id="legacyForm" class="legacy-form" hidden>
+<div class="divider">Legacy admin login</div>
+<label>Username</label>
+<input id="loginUser" autocomplete="username" />
+<label>Password</label>
+<input id="loginPass" type="password" autocomplete="current-password" />
+<button id="loginBtn">Sign in</button>
+<div id="loginErr" class="err"></div>
+</div>
+</div>
+</div>
+<header>
+<span class="logo">AIGW</span>
+<div>
+<div class="title">Chat</div>
+<div class="sub">Prisma AIRS Hybrid POC | LLM = Gemini | 3 MCP servers</div>
+</div>
+<div class="spacer"></div>
+<span id="whoami" class="user"></span>
+<a id="logoutLink" class="logout" href="#">Logout</a>
+</header>
+<div id="errbar" class="banner" hidden></div>
+<main>
+<aside id="tools">
+<h3>MCP Tools</h3>
+<div id="toolsList" class="empty">Loading...</div>
+<h3 style="margin-top:22px">About</h3>
+<div class="arch-note">
+Every message goes to <code>chat.local</code> (backend), 
+which uses LangGraph to route LLM calls to <code>aigw.local</code>
+ and MCP tool calls to <code>mcp-aigw.local</code>. Gemini is the LLM provider.
+</div>
+</aside>
+<section class="chat">
+<div id="messages"></div>
+<div class="composer">
+<textarea id="input" placeholder="Ask me anything... try: what is the weather in Bengaluru?" rows="1"></textarea>
+<button id="sendBtn">Send</button>
+</div>
+</section>
+</main>
+<script>const D = (i) => document.getElementById(i);
+const messagesEl = D('messages'), inputEl = D('input'), sendBtn = D('sendBtn');
+const loginEl = D('login'), errbar = D('errbar'), toolsList = D('toolsList');
+function showError(msg){ if(!msg){ errbar.hidden=true; return; } errbar.textContent=msg; errbar.hidden=false; }
+function addMessage(role, text){
+  const div = document.createElement('div'); div.className='msg '+role;
+  const r = document.createElement('span'); r.className='role';
+  r.textContent = role==='user'?'you': role==='tool'?'tool':'assistant';
+  div.appendChild(r);
+  const body = document.createElement('div'); body.textContent = text;
+  div.appendChild(body); messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight; return div;
+}
+function renderTools(tools){
+  if(!tools||!tools.length){ toolsList.textContent='No tools loaded yet.'; return; }
+  toolsList.innerHTML='';
+  tools.forEach(t => {
+    const d = document.createElement('div'); d.className='tool';
+    const n = document.createElement('div'); n.className='name'; n.textContent=t.name; d.appendChild(n);
+    if(t.description){ const desc=document.createElement('div'); desc.className='desc'; desc.textContent=t.description; d.appendChild(desc); }
+    toolsList.appendChild(d);
+  });
+}
+// URL flag: ?legacy=1 unhides the password form (kept for admin/emergency use).
+const LEGACY_MODE = new URLSearchParams(location.search).has('legacy');
+
+// Central fetch wrapper: any 401 kicks the browser through the OIDC BFF login.
+// The BFF redirects to Keycloak, then back to /api/auth/callback which sets
+// the session cookie and lands us at "/". Falls back to the legacy password
+// form if OIDC is disabled (or if the user forced ?legacy=1).
+async function apiCall(url, opts){
+  opts = opts || {};
+  opts.credentials = 'same-origin';
+  const r = await fetch(url, opts);
+  if (r.status === 401){
+    let oidcOk = true;
+    try {
+      const info = await (await fetch('/api/me', {credentials:'same-origin'})).json();
+      oidcOk = !!info.oidc_available;
+    } catch(_) {}
+    if (oidcOk && !LEGACY_MODE){
+      window.location.href = '/api/auth/login';
+      return null;
+    }
+    loginEl.hidden = false; loginEl.style.display = '';
+    D('legacyForm').hidden = false;
+    return null;
+  }
+  return r;
+}
+
+async function me(){ return (await fetch('/api/me',{credentials:'same-origin'})).json(); }
+async function doLogin(user,pass){
+  const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({username:user,password:pass})});
+  if(!r.ok) throw new Error((await r.json()).detail||'login failed'); return r.json();
+}
+async function doLogout(){ await fetch('/api/logout',{method:'POST',credentials:'same-origin'}); }
+async function sendMessage(msg){
+  const r = await apiCall('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+  if (r === null) throw new Error('session expired');
+  if(!r.ok) throw new Error((await r.json()).detail||'chat failed'); return r.json();
+}
+
+function showLogin(info){
+  loginEl.hidden = false; loginEl.style.display = '';
+  const oidcOk = !!(info && info.oidc_available);
+  // Keycloak button visible iff the BFF is enabled server-side.
+  D('kcLoginBtn').style.display = oidcOk ? '' : 'none';
+  D('oidcHint').style.display   = oidcOk ? '' : 'none';
+  // Legacy form: shown when OIDC is disabled OR when ?legacy=1 is set.
+  const showLegacy = !oidcOk || LEGACY_MODE;
+  D('legacyForm').hidden = !showLegacy;
+  if (showLegacy){ try { D('loginUser').focus(); } catch(_){} }
+}
+
+async function boot(){
+  try {
+    const info = await me();
+    console.log('[boot] /api/me ->', info);
+    if(!info.authenticated){
+      showLogin(info);
+    } else {
+      loginEl.hidden=true; loginEl.style.display='none';
+      // Prefer the OIDC-enriched preferred_username / email if present.
+      const label = info.oidc && info.oidc.preferred_username
+        ? info.oidc.preferred_username + (info.oidc.email ? ' [' + info.oidc.email + ']' : '')
+        : info.username;
+      D('whoami').textContent = label;
+      renderTools(info.tools||[]);
+    }
+  } catch(e){
+    console.error('[boot] error:', e);
+    showLogin({oidc_available: true});
+    D('loginErr').textContent='boot: '+e.message;
+  }
+}
+
+D('kcLoginBtn').addEventListener('click', () => {
+  window.location.href = '/api/auth/login';
+});
+
+D('loginBtn').addEventListener('click', async () => {
+  D('loginErr').textContent = '';
+  const u = D('loginUser').value.trim(), p = D('loginPass').value;
+  if(!u||!p){ D('loginErr').textContent='enter user and pass'; return; }
+  D('loginBtn').disabled = true; D('loginBtn').textContent = 'Signing in...';
+  try{
+    const r = await doLogin(u, p);
+    console.log('[login] response:', r);
+    D('loginPass').value = '';
+    // Force-hide overlay immediately based on login success (no round-trip needed)
+    loginEl.hidden = true; loginEl.style.display = 'none';
+    D('whoami').textContent = r.username || u;
+    // Then boot() to load tools
+    boot();
+    setTimeout(() => { try { inputEl.focus(); } catch(_){} }, 50);
+  } catch(e){
+    console.error('[login] error:', e);
+    D('loginErr').textContent = e.message || String(e);
+  } finally {
+    D('loginBtn').disabled = false; D('loginBtn').textContent = 'Sign in';
+  }
+});
+D('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') D('loginBtn').click(); });
+D('logoutLink').addEventListener('click', async e => {
+  e.preventDefault();
+  // If OIDC is enabled we MUST hit /api/auth/logout FIRST (and only). It
+  // reads the id_token from the server-side session snapshot and forwards it
+  // as id_token_hint to Keycloak's end_session_endpoint -- that's what
+  // actually kills the KEYCLOAK_IDENTITY SSO cookie. It ALSO clears our own
+  // aigw_chat_session cookie + evicts the Redis session in a single call.
+  //
+  // Calling /api/logout first (as we used to) races: it deletes the Redis
+  // snapshot, so by the time /api/auth/logout runs, id_token is gone and
+  // Keycloak's SSO cookie survives -> "Sign in with Keycloak" silently
+  // replays the same identity.
+  let info = {};
+  try { info = await me(); } catch(_) {}
+  if (info.oidc_available) {
+    // Full-page navigation so the browser follows the 302 to Keycloak
+    // (fetch/XHR would follow it silently and the KC end-session cookie
+    // clear wouldn't reach the browser).
+    window.location.href = '/api/auth/logout-redirect';
+    return;
+  }
+  // Legacy password session -> clear the local cookie the plain way.
+  await doLogout();
+  location.reload();
+});
+sendBtn.addEventListener('click', onSend);
+inputEl.addEventListener('keydown', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); onSend(); } });
+async function onSend(){
+  const msg = inputEl.value.trim(); if(!msg) return;
+  inputEl.value=''; sendBtn.disabled=true; showError(null);
+  addMessage('user', msg);
+  const thinking = addMessage('bot',''); thinking.lastChild.textContent='thinking...';
+  try{
+    const res = await sendMessage(msg);
+    thinking.remove();
+    (res.tool_calls||[]).forEach(tc => {
+      const s = tc.name + (tc.args ? '('+JSON.stringify(tc.args)+')' : '') + (tc.output_preview ? '  -->  '+tc.output_preview : '');
+      addMessage('tool', s);
+    });
+    addMessage('bot', res.reply||'(no reply)');
+    if(toolsList.classList.contains('empty') || toolsList.textContent.startsWith('No tools')) { me().then(info => renderTools(info.tools||[])); }
+  } catch(e){
+    thinking.remove();
+    if(e.message==='session expired') return; // apiCall already redirected the browser
+    showError(e.message);
+  } finally { sendBtn.disabled=false; inputEl.focus(); }
+}
+boot();</script>
+</body>
+</html>

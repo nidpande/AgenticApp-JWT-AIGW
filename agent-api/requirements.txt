@@ -1,0 +1,16 @@
+fastapi==0.115.4
+uvicorn[standard]==0.32.0
+itsdangerous==2.2.0
+python-dotenv==1.0.1
+langgraph==0.2.60
+langchain==0.3.7
+langchain-openai==0.2.10
+openai==1.54.4
+httpx==0.27.2
+
+# --- OAuth 2.0 / OIDC (BFF pattern for Keycloak) ---
+authlib==1.3.2
+cryptography==43.0.1
+
+# --- Phase 4: shared session store (survives pod restarts / horizontal scale) ---
+redis==5.0.8

@@ -1,0 +1,105 @@
+# Browser front-end for the AIGW POC.
+# - agent-api container hosts a FastAPI app + static single-page chat UI.
+# - Login via Keycloak OIDC (Phase 1-3) with legacy password fallback (?legacy=1).
+# - Talks to Portkey AIGW at aigw.local:80 (Basic-Auth'd) - the browser
+#   never sees the AIGW creds.  When JWT_ENABLED=ON on the gateway (Phase 3),
+#   agent-api additionally forwards the user's Keycloak access_token as a
+#   Bearer header so per-user policies (SCM Guardrails, RBAC, Rate Limits) apply.
+# - Sessions are persisted in Redis (Phase 4) so pod restarts don't log users out.
+# - Reachable in the browser at http://chat.local
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-api
+  namespace: agent-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: agent-api }
+  template:
+    metadata:
+      labels: { app: agent-api }
+    spec:
+      containers:
+        - name: api
+          image: agent-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 8000, name: http }
+          env:
+            # -- Chat login credentials (legacy password fallback) --
+            - { name: CHAT_USER,
+                valueFrom: { secretKeyRef: { name: chat-creds, key: CHAT_USER } } }
+            - { name: CHAT_PASS,
+                valueFrom: { secretKeyRef: { name: chat-creds, key: CHAT_PASS } } }
+            - { name: CHAT_SESSION_SECRET,
+                valueFrom: { secretKeyRef: { name: chat-creds, key: CHAT_SESSION_SECRET } } }
+            # -- Upstream AIGW addressing (cluster-internal DNS, not through ingress) --
+            - { name: AIGW_BASE_URL,     value: "http://portkey-gateway.airs-gw.svc.cluster.local:8787/v1" }
+            - { name: MCP_GATEWAY_BASE,  value: "http://portkey-gateway.airs-gw.svc.cluster.local:8788" }
+            # -- Gemini + AIGW Basic-Auth (agent-api forwards these upstream) --
+            - { name: GEMINI_API_KEY,
+                valueFrom: { secretKeyRef: { name: llm-creds-mirror, key: GEMINI_API_KEY } } }
+            - { name: GEMINI_MODEL,      value: "gemini-2.5-flash" }
+            - { name: AIGW_USER,
+                valueFrom: { secretKeyRef: { name: aigw-basicauth-mirror, key: AIGW_USER } } }
+            - { name: AIGW_PASS,
+                valueFrom: { secretKeyRef: { name: aigw-basicauth-mirror, key: AIGW_PASS } } }
+            # -- Keycloak OIDC (Phase 1-3). Setting OIDC_ISSUER enables OIDC.
+            #    Empty -> falls back to legacy password login only.
+            #    Browser-facing URLs use http://keycloak.test (via ingress).
+            #    Cluster-internal JWKS URL bypasses ingress for lower latency + no DNS dep.
+            - { name: OIDC_ISSUER,                 value: "http://keycloak.test/realms/aigw" }
+            - { name: OIDC_CLIENT_ID,
+                valueFrom: { secretKeyRef: { name: oidc-client, key: OIDC_CLIENT_ID } } }
+            - { name: OIDC_CLIENT_SECRET,
+                valueFrom: { secretKeyRef: { name: oidc-client, key: OIDC_CLIENT_SECRET } } }
+            - { name: OIDC_REDIRECT_URI,           value: "http://chat.local/api/auth/callback" }
+            - { name: OIDC_POST_LOGOUT_REDIRECT_URI, value: "http://chat.local/" }
+            - { name: OIDC_JWKS_URL,               value: "http://keycloak.keycloak.svc.cluster.local:8080/realms/aigw/protocol/openid-connect/certs" }
+            - { name: OIDC_SCOPES,                 value: "openid email profile aigw-api" }
+            # -- Redis session store (Phase 4). Empty REDIS_URL -> in-memory fallback. --
+            - { name: REDIS_URL,                   value: "redis://redis.agent-app.svc.cluster.local:6379/0" }
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 1500m, memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-api
+  namespace: agent-app
+spec:
+  selector: { app: agent-api }
+  ports:
+    - { name: http, port: 8000, targetPort: 8000 }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chat-ingress
+  namespace: agent-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: chat.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: agent-api
+                port: { number: 8000 }

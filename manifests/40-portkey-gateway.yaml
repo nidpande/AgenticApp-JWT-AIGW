@@ -1,0 +1,97 @@
+# ------------------------------------------------------------------
+# Portkey OSS Gateway - hybrid deployment (customer-owned data plane).
+# AI Gateway on :8787, MCP Gateway on :8788.
+# Config comes from the "portkey-config" ConfigMap (no Portkey CP sync).
+# NO in-line AIRS guardrail here - the operator will add AIRS through the
+# AIGW control plane manually.  This gateway simply proxies to the LLM
+# and the 3 registered MCP servers.
+# ------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: portkey-config
+  namespace: airs-gw
+data:
+  # populated by deploy.sh from configs/portkey-config.json
+  config.json: |
+    {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portkey-gateway
+  namespace: airs-gw
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: portkey-gateway }
+  template:
+    metadata:
+      labels: { app: portkey-gateway }
+    spec:
+      containers:
+        - name: gateway
+          image: portkeyai/gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 8787, name: ai }
+            - { containerPort: 8788, name: mcp }
+          env:
+            - { name: PORT,                 value: "8787" }
+            - { name: MCP_PORT,             value: "8788" }
+            - { name: SERVER_MODE,          value: "all" }
+            - { name: NODE_ENV,             value: "production" }
+            - { name: LOG_LEVEL,            value: "info" }
+            - { name: MANAGED_DEPLOYMENT,   value: "OFF" }
+            - { name: BLOCK_INLINE_CONFIG,  value: "false" }
+            # -- JWT auth (Phase 3). Set JWT_ENABLED=ON to require Bearer tokens
+            #    signed by Keycloak on every /v1/* request. agent-api forwards
+            #    the user's Keycloak access_token as Authorization: Bearer when
+            #    OIDC is enabled.  JWT_JWKS_URI is the in-cluster JWKS endpoint
+            #    (bypasses ingress + host DNS).
+            - { name: JWT_ENABLED,          value: "ON" }
+            - { name: JWT_JWKS_URI,         value: "http://keycloak.keycloak.svc.cluster.local:8080/realms/aigw/protocol/openid-connect/certs" }
+            - { name: JWT_ISSUER,           value: "http://keycloak.test/realms/aigw" }
+            - { name: JWT_AUDIENCE,         value: "aigw-api" }
+            - { name: ENABLE_MCP_CORS,      value: "true" }
+            - { name: MCP_CORS_ALLOWED_ORIGINS, value: "*" }
+            - { name: CACHE_STORE,          value: "redis" }
+            - { name: REDIS_URL,            value: "redis://redis.airs-gw.svc.cluster.local:6379" }
+            - { name: ANALYTICS_STORE,      value: "local" }
+            - { name: LOG_STORE,            value: "local" }
+            - { name: SERVICE_NAME,         value: "airs-aigw-poc" }
+            - { name: PORTKEY_GATEWAY_CONFIG_PATH, value: "/etc/portkey/config.json" }
+            - name: GEMINI_API_KEY
+              valueFrom: { secretKeyRef: { name: llm-creds, key: GEMINI_API_KEY } }
+            - name: GITHUB_TOKEN
+              valueFrom: { secretKeyRef: { name: mcp-upstream-creds, key: GITHUB_TOKEN } }
+          volumeMounts:
+            - { name: config, mountPath: /etc/portkey }
+          readinessProbe:
+            httpGet: { path: /, port: 8787 }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: 8787 }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 200m, memory: 512Mi }
+            limits:   { cpu: 1500m, memory: 2Gi }
+      volumes:
+        - name: config
+          configMap:
+            name: portkey-config
+            items:
+              - { key: config.json, path: config.json }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portkey-gateway
+  namespace: airs-gw
+spec:
+  selector: { app: portkey-gateway }
+  ports:
+    - { name: ai,  port: 8787, targetPort: 8787 }
+    - { name: mcp, port: 8788, targetPort: 8788 }

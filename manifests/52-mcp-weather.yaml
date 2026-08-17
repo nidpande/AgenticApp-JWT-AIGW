@@ -1,0 +1,41 @@
+# Custom Weather MCP server (Python FastMCP)
+# Built locally from /Users/npandey/AIGW/mcp-weather and loaded into kind.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-weather
+  namespace: mcp-servers
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mcp-weather }
+  template:
+    metadata:
+      labels: { app: mcp-weather }
+    spec:
+      containers:
+        - name: mcp
+          image: mcp-weather:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OPENWEATHER_API_KEY
+              valueFrom: { secretKeyRef: { name: mcp-creds, key: OPENWEATHER_API_KEY } }
+            - { name: PORT, value: "8080" }
+          ports:
+            - { containerPort: 8080, name: http }
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 3
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-weather
+  namespace: mcp-servers
+spec:
+  selector: { app: mcp-weather }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }

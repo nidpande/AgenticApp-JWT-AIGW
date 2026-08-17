@@ -1,0 +1,104 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels: { app: keycloak }
+spec:
+  selector: { app: keycloak }
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  serviceName: keycloak
+  replicas: 1
+  selector: { matchLabels: { app: keycloak } }
+  template:
+    metadata: { labels: { app: keycloak } }
+    spec:
+      # Wait for Postgres headless svc + PVC to be ready before starting
+      initContainers:
+      - name: wait-for-postgres
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for Postgres..."
+          until nc -z keycloak-db.keycloak.svc.cluster.local 5432; do
+            sleep 2
+          done
+          echo "Postgres reachable."
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:25.0
+        imagePullPolicy: IfNotPresent
+        # Using vanilla image (no baked-in kc.db). Plain `start` (without
+        # --optimized) auto-triggers the build step on first boot to embed the
+        # Postgres JDBC driver from the KC_DB env. Adds ~30s to first startup.
+        args:
+        - start
+        - --import-realm
+        - --hostname-strict=false
+        env:
+        # DB wiring
+        - { name: KC_DB,          value: postgres }
+        - { name: KC_DB_URL,      value: "jdbc:postgresql://keycloak-db.keycloak.svc.cluster.local:5432/keycloak" }
+        - name: KC_DB_USERNAME
+          valueFrom: { secretKeyRef: { name: keycloak-db, key: POSTGRES_USER } }
+        - name: KC_DB_PASSWORD
+          valueFrom: { secretKeyRef: { name: keycloak-db, key: POSTGRES_PASSWORD } }
+
+        # Hostname strategy -- browser accesses keycloak.test via ingress
+        # AIGW pods can also reach it via svc DNS; token iss= reflects HOSTNAME
+        - { name: KC_HOSTNAME,           value: "http://keycloak.test" }
+        - { name: KC_HOSTNAME_STRICT,    value: "false" }
+        - { name: KC_HTTP_ENABLED,       value: "true" }
+        - { name: KC_PROXY,              value: edge }
+        - { name: KC_HEALTH_ENABLED,     value: "true" }
+        - { name: KC_METRICS_ENABLED,    value: "true" }
+
+        # Master realm admin (Bootstrap once, then rotate via UI)
+        - name: KEYCLOAK_ADMIN
+          valueFrom: { secretKeyRef: { name: keycloak-admin, key: KEYCLOAK_ADMIN } }
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          valueFrom: { secretKeyRef: { name: keycloak-admin, key: KEYCLOAK_ADMIN_PASSWORD } }
+
+        ports:
+        - { name: http,       containerPort: 8080 }
+        - { name: management, containerPort: 9000 }
+        # NOTE: Keycloak 25 serves /health/* on the *management* interface (port 9000),
+        # NOT on the main HTTP port. Probing 8080 returns 404 -> pod gets killed.
+        readinessProbe:
+          httpGet: { path: /health/ready, port: 9000 }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 30    # first startup runs realm import + JPA migration
+        livenessProbe:
+          httpGet: { path: /health/live, port: 9000 }
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        volumeMounts:
+        - { name: realm-import, mountPath: /opt/keycloak/data/import }
+        - { name: data,         mountPath: /opt/keycloak/data }
+        resources:
+          requests: { cpu: 200m, memory: 512Mi }
+          limits:   { cpu: "2",  memory: 2Gi }
+      volumes:
+      - name: realm-import
+        configMap: { name: keycloak-realm-import }
+  volumeClaimTemplates:
+  - metadata: { name: data }
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: standard
+      resources:
+        requests: { storage: 2Gi }

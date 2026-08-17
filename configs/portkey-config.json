@@ -1,0 +1,34 @@
+{
+  "$note": "Portkey OSS gateway config for the AIGW hybrid POC. Provider = Google AI Studio Gemini. Data-plane guardrails NOT wired here - AIRS integration will be added later via the AIGW control plane. The gateway continues to enforce routing, rate-limit, cache, and MCP proxying.",
+  "strategy": {
+    "mode": "single"
+  },
+  "provider": "google",
+  "api_key": "$GEMINI_API_KEY",
+  "override_params": {
+    "model": "gemini-2.5-flash"
+  },
+  "mcp_servers": [
+    {
+      "id": "filesystem",
+      "name": "Filesystem MCP",
+      "url": "http://mcp-filesystem.mcp-servers.svc.cluster.local:8080/mcp",
+      "transport": "http"
+    },
+    {
+      "id": "github",
+      "name": "GitHub MCP",
+      "url": "http://mcp-github.mcp-servers.svc.cluster.local:8080/mcp",
+      "transport": "http",
+      "headers": {
+        "Authorization": "Bearer $GITHUB_TOKEN"
+      }
+    },
+    {
+      "id": "weather",
+      "name": "Weather MCP",
+      "url": "http://mcp-weather.mcp-servers.svc.cluster.local:8080/mcp",
+      "transport": "http"
+    }
+  ]
+}
