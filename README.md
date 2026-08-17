@@ -114,42 +114,6 @@ flowchart LR
 
 **Namespaces created:** `ingress-nginx`, `keycloak`, `airs-gw`, `mcp-servers`, `agent-app`.
 
-### Single-turn request lifecycle (OIDC + JWT)
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant B as Browser
-    participant API as agent-api (BFF)
-    participant KC as Keycloak
-    participant SESS as Redis (sessions)
-    participant N as ingress-nginx (Basic)
-    participant G as Portkey AIGW (JWT)
-    participant O as Gemini
-    B->>API: GET /  (no session cookie)
-    API-->>B: 302 -> /api/auth/login
-    B->>API: GET /api/auth/login
-    API->>KC: 302 -> /realms/aigw/protocol/openid-connect/auth<br/>?client_id=aigw-chat&code_challenge=...
-    B->>KC: username + password
-    KC-->>B: 302 -> chat.local/api/auth/callback?code=...
-    B->>API: GET /api/auth/callback?code=...
-    API->>KC: POST /token (code + PKCE verifier + client_secret)
-    KC-->>API: access_token + id_token + refresh_token
-    API->>SESS: SET aigw-chat:sid:<sid> = pickled snapshot (TTL = access_token_exp - now + 30s)
-    API-->>B: Set-Cookie: chatsid=<sid>; HttpOnly
-    B->>API: POST /api/chat  {message}
-    API->>SESS: GET aigw-chat:sid:<sid>  -> rehydrate ChatSession
-    API->>N: chat/completions<br/>Authorization: Basic aigwuser:*  +  Bearer <access_token>
-    N->>G: proxy
-    G->>KC: fetch JWKS (cached)
-    G->>G: verify signature + iss + aud=aigw-api + exp
-    G->>O: forward to Gemini
-    O-->>G: response
-    G-->>API: response
-    API->>SESS: SET aigw-chat:sid:<sid>  (append turn to history)
-    API-->>B: {"reply": ...}
-```
-
 ### Logout (end-to-end)
 
 ```mermaid
