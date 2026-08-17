@@ -33,7 +33,7 @@ To go hybrid, we replace that local ConfigMap-driven mode with **control-plane-m
 ## Step 2 — Add the credentials to your local `.env`
 
 ```bash
-cd /Users/npandey/AIGW
+cd /path/to/AIGW
 
 cat >> .env <<END
 
@@ -57,7 +57,7 @@ AIGW_CONTROL_PLANE_BASEPATH=https://aigw.portkeydev.com/v1
 ## Step 3 — Patch the Portkey Deployment to use control-plane mode
 
 ```bash
-cd /Users/npandey/AIGW
+cd /path/to/AIGW
 set -a; source .env; set +a
 
 # Store the sensitive client-auth as a Secret

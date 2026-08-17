@@ -30,12 +30,11 @@
 10. [Optional — wire the data plane to Prisma AIRS SCM](#10-optional--wire-the-data-plane-to-prisma-airs-scm-control-plane)
 11. [Restarting the stack after a laptop reboot](#11-restarting-the-stack-after-a-laptop-reboot)
 12. [Common failures & fixes](#12-common-failures--fixes)
-13. [Secret hygiene — where credentials live and how to keep them safe](#13-secret-hygiene--where-credentials-live-and-how-to-keep-them-safe)
-14. [Rotating secrets / passwords](#14-rotating-secrets--passwords)
-15. [Teardown](#15-teardown)
-16. [Appendix A — files & what they do](#appendix-a--files--what-they-do)
-17. [Appendix B — `/etc/hosts` reference](#appendix-b--etchosts-reference)
-18. [Appendix C — Port map & namespace map](#appendix-c--port-map--namespace-map)
+13. [Rotating secrets / passwords](#13-rotating-secrets--passwords)
+14. [Teardown](#14-teardown)
+15. [Appendix A — files & what they do](#appendix-a--files--what-they-do)
+16. [Appendix B — `/etc/hosts` reference](#appendix-b--etchosts-reference)
+17. [Appendix C — Port map & namespace map](#appendix-c--port-map--namespace-map)
 
 ---
 
@@ -788,23 +787,21 @@ With both settings in place, a laptop reboot means: log in → wait ~2 min → o
 
 ---
 
-
-
-##  Rotating secrets / passwords
+## 13. Rotating secrets / passwords
 
 Before you use this stack for anything real, rotate every hard-coded credential.
 
-### 12.1 Keycloak admin password
+### 13.1 Keycloak admin password
 
 1. Edit [`keycloak/03-keycloak-secret.yaml`](keycloak/03-keycloak-secret.yaml:1) — replace `kc-admin-poc-CHANGE-ME`.
 2. `kubectl apply -f keycloak/03-keycloak-secret.yaml`
 3. `kubectl -n keycloak rollout restart statefulset/keycloak`
 
-### 12.2 Postgres password (Keycloak DB)
+### 13.2 Postgres password (Keycloak DB)
 
 Only safe **before first boot**. If Keycloak has already written to the DB with the old password, rotating means: `kubectl -n keycloak delete pvc data-keycloak-db-0` and re-deploy (wipes users).
 
-### 12.3 OIDC client secret
+### 13.3 OIDC client secret
 
 Both files MUST match:
 
@@ -817,21 +814,21 @@ After editing both:
 kubectl -n agent-app rollout restart deploy/agent-api
 ```
 
-### 12.4 Seeded user passwords (alice/bob/kcadmin)
+### 13.4 Seeded user passwords (alice/bob/kcadmin)
 
 Change them in the Keycloak admin UI (**realm aigw → Users → *user* → Credentials → Reset password**). The realm JSON only affects the first boot.
 
-### 12.5 `AIGW_USER` / `AIGW_PASS`
+### 13.5 `AIGW_USER` / `AIGW_PASS`
 
 Change in `.env`, re-run `./deploy.sh`. The htpasswd secret in `airs-gw/basic-auth` is regenerated.
 
-### 12.6 `CHAT_SESSION_SECRET`
+### 13.6 `CHAT_SESSION_SECRET`
 
 Change in `.env`, re-run `./deploy.sh`. All existing sessions will be invalidated (users must re-log-in).
 
 ---
 
-## 15. Teardown
+## 14. Teardown
 
 To destroy everything:
 
