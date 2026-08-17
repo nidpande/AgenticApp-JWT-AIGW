@@ -195,7 +195,7 @@ The Weather MCP server proxies to OpenWeatherMap.
 4. **Wait ~10 minutes** — new keys take a few minutes to become active.
 5. This becomes `OPENWEATHER_API_KEY` in [`.env`](.env.example:27).
 
-### 3.4 Prisma AIRS SCM tenant (OPTIONAL — only for §10)
+### 3.4 Prisma AIRS SCM tenant 
 
 Only needed if you want to wire the runtime scanner and per-user guardrails. Skip if you just want the local stack.
 
@@ -206,7 +206,7 @@ Only needed if you want to wire the runtime scanner and per-user guardrails. Ski
   - `PORTKEY_CLIENT_AUTH` (long token)
   - `ALBUS_BASEPATH` (usually `https://albus.portkey.ai`)
 
-Do **not** paste these into `.env` — they are wired via a `kubectl patch` in §10.
+Do **not** paste these into `.env` — they are wired via a `kubectl patch` 
 
 ---
 
