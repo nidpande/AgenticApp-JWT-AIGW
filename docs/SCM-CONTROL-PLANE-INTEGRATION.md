@@ -105,7 +105,7 @@ Back in SCM AI Gateway page — your gateway should now appear under Registered 
 - Health = healthy
 
 ### 4d. End-to-end test through the chat UI
-No code change needed on `agent-api`. Open http://127.0.0.1:8080/ → send any prompt → request should succeed AND appear in SCM under Insights → AI Gateway → Logs.
+No code change needed on `agent-api`. Open http://127.0.0.1:8080/ → send any prompt → request should succeed AND appear in SCM under → AI Gateway → Observability -logs.
 
 ---
 
